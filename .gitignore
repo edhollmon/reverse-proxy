@@ -1,0 +1,12 @@
+# Binary
+reverse-proxy
+
+# Build output
+/bin/
+
+# Environment
+.env
+.env.*
+
+# macOS
+.DS_Store

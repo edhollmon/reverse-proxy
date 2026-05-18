@@ -1,0 +1,24 @@
+{
+    "connections": {
+        "tcp": [
+            {
+                "type": "tcp",
+                "lbstrategy": "round-robin",
+                "hosts": [
+                    { "host": "10.0.0.1", "port": "9000" },
+                    { "host": "10.0.0.2", "port": "9000" }
+                ]
+            }
+        ],
+        "http": [
+            {
+                "type": "http",
+                "lbstrategy": "least-connections",
+                "hosts": [
+                    { "host": "10.0.1.1", "port": "8080" },
+                    { "host": "10.0.1.2", "port": "8080" }
+                ]
+            }
+        ]
+    }
+}
