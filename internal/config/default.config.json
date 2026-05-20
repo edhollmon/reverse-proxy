@@ -13,6 +13,7 @@
         "http": [
             {
                 "type": "http",
+                "prefix": "/api",
                 "lbstrategy": "least-connections",
                 "hosts": [
                     { "host": "10.0.1.1", "port": "8080" },

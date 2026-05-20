@@ -30,13 +30,15 @@ func (h *HostDetail) UnmarshalJSON(data []byte) error {
 
 type Connection struct {
 	connType   string
+	Prefix     string
 	lbstrategy string
-	hosts      []HostDetail
+	Backends   []string
 }
 
 func (c *Connection) UnmarshalJSON(data []byte) error {
 	var v struct {
 		ConnType   string       `json:"type"`
+		Prefix     string       `json:"prefix"`
 		LBStrategy string       `json:"lbstrategy"`
 		Hosts      []HostDetail `json:"hosts"`
 	}
@@ -44,22 +46,26 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	c.connType = v.ConnType
+	c.Prefix = v.Prefix
 	c.lbstrategy = v.LBStrategy
-	c.hosts = v.Hosts
+	c.Backends = make([]string, len(v.Hosts))
+	for i, h := range v.Hosts {
+		c.Backends[i] = h.host + ":" + h.port
+	}
 	return nil
 }
 
 type TCPConnectionConfig struct {
-	connections []Connection
+	Connections []Connection
 }
 
 type HTTPConnectionConfig struct {
-	connections []Connection
+	Connections []Connection
 }
 
 type ConfigService struct {
-	tcp  TCPConnectionConfig
-	http HTTPConnectionConfig
+	Tcp  TCPConnectionConfig
+	Http HTTPConnectionConfig
 	// Web Sockets, gRPC, ...
 }
 
@@ -96,26 +102,8 @@ func (cs *ConfigService) parseConfig(data []byte) error {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	cs.tcp = TCPConnectionConfig{connections: cfg.Connections.TCP}
-	cs.http = HTTPConnectionConfig{connections: cfg.Connections.HTTP}
+	cs.Tcp = TCPConnectionConfig{Connections: cfg.Connections.TCP}
+	cs.Http = HTTPConnectionConfig{Connections: cfg.Connections.HTTP}
 
 	return nil
-}
-
-func (cs *ConfigService) String() string {
-	result := "TCP connections:\n"
-	for _, conn := range cs.tcp.connections {
-		result += fmt.Sprintf("  type=%s lbstrategy=%s\n", conn.connType, conn.lbstrategy)
-		for _, h := range conn.hosts {
-			result += fmt.Sprintf("    host=%s port=%s\n", h.host, h.port)
-		}
-	}
-	result += "HTTP connections:\n"
-	for _, conn := range cs.http.connections {
-		result += fmt.Sprintf("  type=%s lbstrategy=%s\n", conn.connType, conn.lbstrategy)
-		for _, h := range conn.hosts {
-			result += fmt.Sprintf("    host=%s port=%s\n", h.host, h.port)
-		}
-	}
-	return result
 }
