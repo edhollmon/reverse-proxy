@@ -3,10 +3,11 @@
         "tcp": [
             {
                 "type": "tcp",
+                "port": "9090",
                 "lbstrategy": "round-robin",
                 "hosts": [
-                    { "host": "10.0.0.1", "port": "9000" },
-                    { "host": "10.0.0.2", "port": "9000" }
+                    { "host": "localhost", "port": "9091" },
+                    { "host": "localhost", "port": "9092" }
                 ]
             }
         ],

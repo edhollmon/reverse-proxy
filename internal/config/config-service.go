@@ -31,6 +31,7 @@ func (h *HostDetail) UnmarshalJSON(data []byte) error {
 type Connection struct {
 	connType   string
 	Prefix     string
+	Port       string
 	lbstrategy string
 	Backends   []string
 }
@@ -39,6 +40,7 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 	var v struct {
 		ConnType   string       `json:"type"`
 		Prefix     string       `json:"prefix"`
+		Port       string       `json:"port"`
 		LBStrategy string       `json:"lbstrategy"`
 		Hosts      []HostDetail `json:"hosts"`
 	}
@@ -47,6 +49,7 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 	}
 	c.connType = v.ConnType
 	c.Prefix = v.Prefix
+	c.Port = v.Port
 	c.lbstrategy = v.LBStrategy
 	c.Backends = make([]string, len(v.Hosts))
 	for i, h := range v.Hosts {
