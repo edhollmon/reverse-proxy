@@ -16,7 +16,9 @@ func main() {
 	fmt.Println("Config loaded: ", cs)
 
 	rp := server.NewReverseProxy()
-	rp.Start()
+	if err := rp.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 	fmt.Println("Server shutting down")
 }

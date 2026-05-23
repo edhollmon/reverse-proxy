@@ -23,8 +23,8 @@ func TestTcpclient_Proxy(t *testing.T) {
 	// net.Pipe gives two in-memory connected ends
 	clientConn, proxyClient := net.Pipe()
 	proxyBackend, backendConn := net.Pipe()
-	defer clientConn.Close()
-	defer backendConn.Close()
+	defer func() { _ = clientConn.Close() }()
+	defer func() { _ = backendConn.Close() }()
 
 	c := &tcpclient{cid: 1, conn: proxyClient, backend: proxyBackend}
 
@@ -58,8 +58,8 @@ func TestTcpclient_Proxy(t *testing.T) {
 		t.Errorf("client got %q, want %q", buf2, "pong")
 	}
 
-	clientConn.Close()
-	backendConn.Close()
+	_ = clientConn.Close()
+	_ = backendConn.Close()
 	<-done
 }
 
@@ -69,15 +69,15 @@ func TestTcpServer_ProxiesData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer backendLn.Close()
+	defer func() { _ = backendLn.Close() }()
 
 	go func() {
 		conn, err := backendLn.Accept()
 		if err != nil {
 			return
 		}
-		defer conn.Close()
-		io.Copy(conn, conn)
+		defer func() { _ = conn.Close() }()
+		_, _ = io.Copy(conn, conn)
 	}()
 
 	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()})
@@ -89,13 +89,15 @@ func TestTcpServer_ProxiesData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial proxy: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if _, err := conn.Write([]byte("hello")); err != nil {
 		t.Fatal(err)
 	}
 
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	buf := make([]byte, 5)
 	if _, err := io.ReadFull(conn, buf); err != nil {
 		t.Fatalf("read from proxy: %v", err)

@@ -48,9 +48,13 @@ func TestLoadConfig_Valid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(data)
-	f.Close()
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	if _, err := f.WriteString(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	cs := NewConfigService()
 	if err := cs.LoadConfig(f.Name()); err != nil {
@@ -76,9 +80,13 @@ func TestLoadConfig_InvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("not-valid-json{")
-	f.Close()
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	if _, err := f.WriteString("not-valid-json{"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	cs := NewConfigService()
 	if err := cs.LoadConfig(f.Name()); err == nil {

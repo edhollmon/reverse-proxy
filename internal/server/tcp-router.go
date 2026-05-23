@@ -52,13 +52,13 @@ func (c *tcpclient) proxy() {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		io.Copy(c.backend, c.conn)
-		c.backend.Close()
+		_, _ = io.Copy(c.backend, c.conn)
+		_ = c.backend.Close()
 	}()
 	go func() {
 		defer wg.Done()
-		io.Copy(c.conn, c.backend)
-		c.conn.Close()
+		_, _ = io.Copy(c.conn, c.backend)
+		_ = c.conn.Close()
 	}()
 	wg.Wait()
 }
@@ -119,7 +119,7 @@ func (s *TcpServer) handleConn(conn net.Conn) {
 	backendConn, err := net.Dial("tcp", backendAddr)
 	if err != nil {
 		fmt.Printf("Client %d failed to connect to backend %s: %v\n", cid, backendAddr, err)
-		conn.Close()
+		_ = conn.Close()
 		return
 	}
 
