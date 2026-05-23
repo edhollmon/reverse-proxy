@@ -20,11 +20,11 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.mod
 
+      - name: Install golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin v2.5.0
+
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          install-mode: binary
+        run: make lint
 
       - name: Test
         run: make test
