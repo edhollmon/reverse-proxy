@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,8 +19,25 @@ func NewReverseProxy(cs *cfg.ConfigService) *ReverseProxy {
 }
 
 func (rp *ReverseProxy) Start() error {
-	go rp.startTcpProxy()
-	rp.startHttpProxy()
+	hasTCP := len(rp.configService.Tcp.Connections) > 0
+	hasHTTP := len(rp.configService.Http.Connections) > 0
+
+	if !hasTCP && !hasHTTP {
+		return fmt.Errorf("no connections configured")
+	}
+
+	if hasTCP && hasHTTP {
+		go rp.startHttpProxy()
+		rp.startTcpProxy()
+		return nil
+	}
+
+	if hasHTTP {
+		rp.startHttpProxy()
+		return nil
+	}
+
+	rp.startTcpProxy()
 	return nil
 }
 

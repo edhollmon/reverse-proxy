@@ -19,9 +19,15 @@ func (router *TcpRouter) Add(listenAddr string, backends []string) {
 }
 
 func (router *TcpRouter) Start() {
+	var wg sync.WaitGroup
 	for _, lb := range router.lbs {
-		go lb.server.start()
+		wg.Add(1)
+		go func(lb *TcpLoadBalancer) {
+			defer wg.Done()
+			lb.server.start()
+		}(lb)
 	}
+	wg.Wait()
 }
 
 type TcpLoadBalancer struct {
