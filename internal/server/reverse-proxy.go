@@ -13,25 +13,13 @@ type ReverseProxy struct {
 	configService *cfg.ConfigService
 }
 
-func NewReverseProxy() *ReverseProxy {
-	return &ReverseProxy{}
+func NewReverseProxy(cs *cfg.ConfigService) *ReverseProxy {
+	return &ReverseProxy{configService: cs}
 }
 
 func (rp *ReverseProxy) Start() error {
-	if err := rp.loadConfig(); err != nil {
-		return err
-	}
 	go rp.startTcpProxy()
 	rp.startHttpProxy()
-	return nil
-}
-
-func (rp *ReverseProxy) loadConfig() error {
-	cs := cfg.NewConfigService()
-	if err := cs.LoadDefaultConfig(); err != nil {
-		return err
-	}
-	rp.configService = cs
 	return nil
 }
 

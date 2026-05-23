@@ -2,6 +2,7 @@ package services
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -91,5 +92,62 @@ func TestLoadConfig_InvalidJSON(t *testing.T) {
 	cs := NewConfigService()
 	if err := cs.LoadConfig(f.Name()); err == nil {
 		t.Error("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestParseConfig_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		json    string
+		wantErr string
+	}{
+		{
+			name:    "tcp missing port",
+			json:    `{"connections":{"tcp":[{"type":"tcp","lbstrategy":"round-robin","hosts":[{"host":"localhost","port":"9091"}]}]}}`,
+			wantErr: "tcp[0]: missing port",
+		},
+		{
+			name:    "tcp unknown lbstrategy",
+			json:    `{"connections":{"tcp":[{"type":"tcp","port":"9090","lbstrategy":"random","hosts":[{"host":"localhost","port":"9091"}]}]}}`,
+			wantErr: `tcp[0]: unknown lbstrategy "random"`,
+		},
+		{
+			name:    "tcp no hosts",
+			json:    `{"connections":{"tcp":[{"type":"tcp","port":"9090","lbstrategy":"round-robin","hosts":[]}]}}`,
+			wantErr: "tcp[0]: must have at least one host",
+		},
+		{
+			name:    "tcp host missing host field",
+			json:    `{"connections":{"tcp":[{"type":"tcp","port":"9090","lbstrategy":"round-robin","hosts":[{"host":"","port":"9091"}]}]}}`,
+			wantErr: `tcp[0] host[0]: invalid host:port ":9091"`,
+		},
+		{
+			name:    "tcp host missing port field",
+			json:    `{"connections":{"tcp":[{"type":"tcp","port":"9090","lbstrategy":"round-robin","hosts":[{"host":"localhost","port":""}]}]}}`,
+			wantErr: `tcp[0] host[0]: invalid host:port "localhost:"`,
+		},
+		{
+			name:    "http unknown lbstrategy",
+			json:    `{"connections":{"http":[{"type":"http","prefix":"/api","lbstrategy":"weighted","hosts":[{"host":"localhost","port":"8080"}]}]}}`,
+			wantErr: `http[0]: unknown lbstrategy "weighted"`,
+		},
+		{
+			name:    "http no hosts",
+			json:    `{"connections":{"http":[{"type":"http","prefix":"/api","lbstrategy":"least-connections","hosts":[]}]}}`,
+			wantErr: "http[0]: must have at least one host",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := NewConfigService()
+			err := cs.parseConfig([]byte(tt.json))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want it to contain %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }

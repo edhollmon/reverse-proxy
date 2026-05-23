@@ -50,7 +50,11 @@ The config file is JSON. Pass a path at startup, or omit it to use the embedded 
 ## Running
 
 ```bash
+# use the built-in default config
 go run .
+
+# use a custom config file
+go run . -config path/to/config.json
 ```
 
 ## Local TCP load balancing walkthrough

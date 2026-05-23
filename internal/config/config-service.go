@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 )
 
@@ -72,6 +73,30 @@ type ConfigService struct {
 	// Web Sockets, gRPC, ...
 }
 
+var validLBStrategies = map[string]bool{
+	"round-robin":       true,
+	"least-connections": true,
+}
+
+func (c *Connection) validate(label string) error {
+	if !validLBStrategies[c.lbstrategy] {
+		return fmt.Errorf("%s: unknown lbstrategy %q, must be one of: round-robin, least-connections", label, c.lbstrategy)
+	}
+	if c.connType == "tcp" && c.Port == "" {
+		return fmt.Errorf("%s: missing port", label)
+	}
+	if len(c.Backends) == 0 {
+		return fmt.Errorf("%s: must have at least one host", label)
+	}
+	for i, b := range c.Backends {
+		host, port, err := net.SplitHostPort(b)
+		if err != nil || host == "" || port == "" {
+			return fmt.Errorf("%s host[%d]: invalid host:port %q", label, i, b)
+		}
+	}
+	return nil
+}
+
 func NewConfigService() *ConfigService {
 	return &ConfigService{}
 }
@@ -107,6 +132,17 @@ func (cs *ConfigService) parseConfig(data []byte) error {
 
 	cs.Tcp = TCPConnectionConfig{Connections: cfg.Connections.TCP}
 	cs.Http = HTTPConnectionConfig{Connections: cfg.Connections.HTTP}
+
+	for i, c := range cs.Tcp.Connections {
+		if err := c.validate(fmt.Sprintf("tcp[%d]", i)); err != nil {
+			return err
+		}
+	}
+	for i, c := range cs.Http.Connections {
+		if err := c.validate(fmt.Sprintf("http[%d]", i)); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
