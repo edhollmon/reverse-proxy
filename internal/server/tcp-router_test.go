@@ -113,14 +113,14 @@ func TestTcpServer_Shutdown_DrainsActiveConnections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer backendLn.Close()
+	defer func() { _ = backendLn.Close() }()
 
 	go func() {
 		conn, err := backendLn.Accept()
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_, _ = io.Copy(conn, conn)
 	}()
 
@@ -171,7 +171,7 @@ func TestTcpRouter_Shutdown_RespectsContextTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer backendLn.Close()
+	defer func() { _ = backendLn.Close() }()
 
 	// Backend holds the connection open so shutdown can't drain naturally
 	go func() {
@@ -179,7 +179,7 @@ func TestTcpRouter_Shutdown_RespectsContextTimeout(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		time.Sleep(10 * time.Second)
 	}()
 
@@ -191,7 +191,7 @@ func TestTcpRouter_Shutdown_RespectsContextTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	router := &TcpRouter{lbs: []*TcpLoadBalancer{lb}}
 
