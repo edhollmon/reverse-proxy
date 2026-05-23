@@ -1,24 +1,28 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	services "github.com/edhollmon/reverse-proxy/internal/config"
 	"github.com/edhollmon/reverse-proxy/internal/server"
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
 	cs := services.NewConfigService()
 	if err := cs.LoadDefaultConfig(); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
-	fmt.Println("Config loaded: ", cs)
+	slog.Info("config loaded", "config", cs)
 
 	rp := server.NewReverseProxy()
 	if err := rp.Start(); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to start server", "error", err)
+		os.Exit(1)
 	}
 
-	fmt.Println("Server shutting down")
+	slog.Info("server shutting down")
 }

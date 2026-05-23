@@ -2,10 +2,10 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 )
@@ -86,8 +86,8 @@ func (s *TcpServer) start() {
 	l, err := net.Listen("tcp", s.address)
 	if err != nil {
 		s.mu.Unlock()
-		log.Fatalf("TCP proxy failed to listen on %s: %v", s.address, err)
-		return
+		slog.Error("TCP proxy failed to listen", "addr", s.address, "error", err)
+		os.Exit(1)
 	}
 	s.listener = l
 	s.mu.Unlock()
@@ -101,7 +101,7 @@ func (s *TcpServer) start() {
 			if errors.Is(err, net.ErrClosed) {
 				break
 			}
-			fmt.Println("Error accepting connection:", err)
+			slog.Error("error accepting connection", "error", err)
 			continue
 		}
 		s.grWG.Add(1)
@@ -113,12 +113,12 @@ func (s *TcpServer) handleConn(conn net.Conn) {
 	defer s.grWG.Done()
 
 	cid := s.nextcid.Add(1)
-	fmt.Printf("Client %d connected from %s\n", cid, conn.RemoteAddr())
+	slog.Info("client connected", "cid", cid, "remote_addr", conn.RemoteAddr())
 
 	backendAddr := s.lb.next()
 	backendConn, err := net.Dial("tcp", backendAddr)
 	if err != nil {
-		fmt.Printf("Client %d failed to connect to backend %s: %v\n", cid, backendAddr, err)
+		slog.Error("failed to connect to backend", "cid", cid, "backend", backendAddr, "error", err)
 		_ = conn.Close()
 		return
 	}
@@ -129,11 +129,11 @@ func (s *TcpServer) handleConn(conn net.Conn) {
 	s.clients[cid] = c
 	s.mu.Unlock()
 
-	fmt.Printf("Client %d proxying -> %s\n", cid, backendAddr)
+	slog.Info("client proxying", "cid", cid, "backend", backendAddr)
 	c.proxy()
 
 	s.mu.Lock()
 	delete(s.clients, cid)
 	s.mu.Unlock()
-	fmt.Printf("Client %d disconnected\n", cid)
+	slog.Info("client disconnected", "cid", cid)
 }

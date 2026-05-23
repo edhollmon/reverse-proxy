@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -61,7 +61,7 @@ func NewHttpLoadBalancer(addrs []string) *HttpLoadBalancer {
 		}
 		u, err := url.Parse(addr)
 		if err != nil {
-			log.Printf("skipping invalid backend %q: %v", addr, err)
+			slog.Warn("skipping invalid backend", "addr", addr, "error", err)
 			continue
 		}
 		backends = append(backends, u)

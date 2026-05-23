@@ -1,9 +1,9 @@
 package server
 
 import (
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	cfg "github.com/edhollmon/reverse-proxy/internal/config"
@@ -29,7 +29,6 @@ func (rp *ReverseProxy) Start() error {
 func (rp *ReverseProxy) loadConfig() error {
 	cs := cfg.NewConfigService()
 	if err := cs.LoadDefaultConfig(); err != nil {
-		log.Fatal(err)
 		return err
 	}
 	rp.configService = cs
@@ -41,16 +40,23 @@ func (rp *ReverseProxy) startHttpProxy() {
 	for _, httpConfig := range rp.configService.Http.Connections {
 		router.Add(httpConfig.Prefix, NewHttpLoadBalancer(httpConfig.Backends))
 	}
-	fmt.Println("HTTP Reverse Proxy listening on 8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	slog.Info("HTTP reverse proxy listening", "port", 8080)
+	if err := http.ListenAndServe(":8080", router); err != nil {
+		slog.Error("HTTP server stopped", "error", err)
+		os.Exit(1)
+	}
 }
 
 func (rp *ReverseProxy) startTcpProxy() {
 	router := &TcpRouter{}
 	for i, tcpConfig := range rp.configService.Tcp.Connections {
-		fmt.Printf("TCP Reverse Proxy listening on localhost:%s -> backends: %v\n", tcpConfig.Port, tcpConfig.Backends)
+		slog.Info("TCP reverse proxy listening", "port", tcpConfig.Port, "backends", tcpConfig.Backends)
 		for j, backend := range tcpConfig.Backends {
-			fmt.Printf("  # terminal %d — backend %c\n  nc -l %s\n", i*len(tcpConfig.Backends)+j+1, rune('A'+j), backend[strings.LastIndex(backend, ":")+1:])
+			slog.Info("TCP backend hint",
+				"terminal", i*len(tcpConfig.Backends)+j+1,
+				"backend_label", string(rune('A'+j)),
+				"nc_port", backend[strings.LastIndex(backend, ":")+1:],
+			)
 		}
 		router.Add(":"+tcpConfig.Port, tcpConfig.Backends)
 	}
