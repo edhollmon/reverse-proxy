@@ -13,6 +13,11 @@ import (
 	"github.com/edhollmon/reverse-proxy/internal/server"
 )
 
+const (
+	exitConfig   = 78 // EX_CONFIG
+	exitSoftware = 70 // EX_SOFTWARE
+)
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 
@@ -25,12 +30,12 @@ func main() {
 		slog.Info("loading config", "path", *configPath)
 		if err := cs.LoadConfig(*configPath); err != nil {
 			slog.Error("failed to load config", "error", err)
-			os.Exit(1)
+			os.Exit(exitConfig)
 		}
 	} else {
 		if err := cs.LoadDefaultConfig(); err != nil {
 			slog.Error("failed to load default config", "error", err)
-			os.Exit(1)
+			os.Exit(exitConfig)
 		}
 	}
 
@@ -48,7 +53,7 @@ func main() {
 	case err := <-serverErr:
 		if err != nil {
 			slog.Error("server error", "error", err)
-			os.Exit(1)
+			os.Exit(exitSoftware)
 		}
 	case <-quit:
 	}
@@ -58,7 +63,7 @@ func main() {
 	defer cancel()
 	if err := rp.Shutdown(ctx); err != nil {
 		slog.Error("shutdown error", "error", err)
-		os.Exit(1)
+		os.Exit(exitSoftware)
 	}
 	slog.Info("server stopped")
 }
