@@ -1,8 +1,11 @@
-pre-push:
+pre-commit:
   parallel: true
   jobs:
     - name: lint
       run: make lint
 
+pre-push:
+  parallel: true
+  jobs:
     - name: test
       run: make test
