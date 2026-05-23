@@ -30,11 +30,25 @@ jobs:
         run: make test
 
       - name: Build
-        run: make build
+        run: make build-all
 
-      - name: Upload binary
+      - name: Upload Linux binary
         uses: actions/upload-artifact@v4
         with:
-          name: reverse-proxy-${{ github.sha }}
-          path: bin/reverse-proxy
+          name: reverse-proxy-linux-amd64-${{ github.sha }}
+          path: bin/reverse-proxy-linux-amd64
+          retention-days: 30
+
+      - name: Upload macOS (Intel) binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: reverse-proxy-darwin-amd64-${{ github.sha }}
+          path: bin/reverse-proxy-darwin-amd64
+          retention-days: 30
+
+      - name: Upload macOS (Apple Silicon) binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: reverse-proxy-darwin-arm64-${{ github.sha }}
+          path: bin/reverse-proxy-darwin-arm64
           retention-days: 30
