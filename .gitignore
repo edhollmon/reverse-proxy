@@ -3,6 +3,7 @@ reverse-proxy
 
 # Build output
 /bin/
+coverage.out
 
 # Environment
 .env

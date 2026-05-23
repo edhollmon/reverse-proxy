@@ -18,12 +18,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache-dependency-path: go.mod
 
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          install-mode: binary
 
       - name: Test
         run: make test
