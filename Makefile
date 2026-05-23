@@ -12,7 +12,7 @@ test:
 	go test -v -race -coverprofile=coverage.out ./...
 
 build:
-	go build -o $(BINARY) ./...
+	go build -o $(BINARY) .
 
 clean:
 	rm -rf bin/ coverage.out
