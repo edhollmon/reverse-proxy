@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	services "github.com/edhollmon/reverse-proxy/internal/config"
 	"github.com/edhollmon/reverse-proxy/internal/server"
@@ -33,10 +37,28 @@ func main() {
 	slog.Info("config loaded", "config", cs)
 
 	rp := server.NewReverseProxy(cs)
-	if err := rp.Start(); err != nil {
-		slog.Error("failed to start server", "error", err)
-		os.Exit(1)
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	serverErr := make(chan error, 1)
+	go func() { serverErr <- rp.Start() }()
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			slog.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	case <-quit:
 	}
 
-	slog.Info("server shutting down")
+	slog.Info("shutting down")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := rp.Shutdown(ctx); err != nil {
+		slog.Error("shutdown error", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("server stopped")
 }

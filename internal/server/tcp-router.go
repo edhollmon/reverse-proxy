@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -28,6 +29,26 @@ func (router *TcpRouter) Start() {
 		}(lb)
 	}
 	wg.Wait()
+}
+
+func (router *TcpRouter) Shutdown(ctx context.Context) {
+	var wg sync.WaitGroup
+	for _, lb := range router.lbs {
+		wg.Add(1)
+		go func(lb *TcpLoadBalancer) {
+			defer wg.Done()
+			lb.server.shutdown()
+		}(lb)
+	}
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
 }
 
 type TcpLoadBalancer struct {
@@ -85,6 +106,15 @@ func newTCPServer(address string, lb *TcpLoadBalancer) *TcpServer {
 		lb:      lb,
 		clients: make(map[uint64]*tcpclient),
 	}
+}
+
+func (s *TcpServer) shutdown() {
+	s.mu.Lock()
+	if s.listener != nil {
+		_ = s.listener.Close()
+	}
+	s.mu.Unlock()
+	s.grWG.Wait()
 }
 
 func (s *TcpServer) start() {

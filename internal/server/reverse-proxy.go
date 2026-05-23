@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,10 +14,24 @@ import (
 
 type ReverseProxy struct {
 	configService *cfg.ConfigService
+	httpServer    *http.Server
+	tcpRouter     *TcpRouter
 }
 
 func NewReverseProxy(cs *cfg.ConfigService) *ReverseProxy {
 	return &ReverseProxy{configService: cs}
+}
+
+func (rp *ReverseProxy) Shutdown(ctx context.Context) error {
+	if rp.httpServer != nil {
+		if err := rp.httpServer.Shutdown(ctx); err != nil {
+			return err
+		}
+	}
+	if rp.tcpRouter != nil {
+		rp.tcpRouter.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (rp *ReverseProxy) Start() error {
@@ -46,8 +62,9 @@ func (rp *ReverseProxy) startHttpProxy() {
 	for _, httpConfig := range rp.configService.Http.Connections {
 		router.Add(httpConfig.Prefix, NewHttpLoadBalancer(httpConfig.Backends))
 	}
+	rp.httpServer = &http.Server{Addr: ":8080", Handler: router}
 	slog.Info("HTTP reverse proxy listening", "port", 8080)
-	if err := http.ListenAndServe(":8080", router); err != nil {
+	if err := rp.httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("HTTP server stopped", "error", err)
 		os.Exit(1)
 	}
@@ -66,5 +83,6 @@ func (rp *ReverseProxy) startTcpProxy() {
 		}
 		router.Add(":"+tcpConfig.Port, tcpConfig.Backends)
 	}
+	rp.tcpRouter = router
 	router.Start()
 }

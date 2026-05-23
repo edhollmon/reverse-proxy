@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"io"
 	"net"
 	"testing"
@@ -104,6 +105,103 @@ func TestTcpServer_ProxiesData(t *testing.T) {
 	}
 	if string(buf) != "hello" {
 		t.Errorf("got %q, want %q", buf, "hello")
+	}
+}
+
+func TestTcpServer_Shutdown_DrainsActiveConnections(t *testing.T) {
+	backendLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer backendLn.Close()
+
+	go func() {
+		conn, err := backendLn.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = io.Copy(conn, conn)
+	}()
+
+	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()})
+	go lb.server.start()
+	proxyAddr := waitForListener(t, lb.server)
+
+	activeConn, err := net.DialTimeout("tcp", proxyAddr, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		lb.server.shutdown()
+		close(shutdownDone)
+	}()
+
+	// Poll until the listener is closed (new dials fail)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		c, err := net.DialTimeout("tcp", proxyAddr, 50*time.Millisecond)
+		if err != nil {
+			break
+		}
+		_ = c.Close()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Shutdown should be blocked while the active connection is still open
+	select {
+	case <-shutdownDone:
+		t.Error("shutdown returned before active connection was closed")
+	default:
+	}
+
+	// Closing the connection should unblock shutdown
+	_ = activeConn.Close()
+	select {
+	case <-shutdownDone:
+	case <-time.After(2 * time.Second):
+		t.Error("shutdown did not complete after active connection was closed")
+	}
+}
+
+func TestTcpRouter_Shutdown_RespectsContextTimeout(t *testing.T) {
+	backendLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer backendLn.Close()
+
+	// Backend holds the connection open so shutdown can't drain naturally
+	go func() {
+		conn, err := backendLn.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		time.Sleep(10 * time.Second)
+	}()
+
+	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()})
+	go lb.server.start()
+	proxyAddr := waitForListener(t, lb.server)
+
+	conn, err := net.DialTimeout("tcp", proxyAddr, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	router := &TcpRouter{lbs: []*TcpLoadBalancer{lb}}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	router.Shutdown(ctx)
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Errorf("Shutdown took %v, expected it to return within context timeout", elapsed)
 	}
 }
 
