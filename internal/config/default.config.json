@@ -19,6 +19,14 @@
                 "type": "http",
                 "prefix": "/api",
                 "lbstrategy": "least-connections",
+                "transport": {
+                    "dialTimeout": "5s",
+                    "responseHeaderTimeout": "30s",
+                    "idleConnTimeout": "90s",
+                    "maxIdleConns": 100,
+                    "maxIdleConnsPerHost": 20,
+                    "maxConnsPerHost": 200
+                },
                 "hosts": [
                     { "host": "10.0.1.1", "port": "8080" },
                     { "host": "10.0.1.2", "port": "8080" }

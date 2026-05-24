@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	cfg "github.com/edhollmon/reverse-proxy/internal/config"
 )
 
 type statusResponseWriter struct {
@@ -67,7 +69,7 @@ func (route *HttpRoute) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	route.lb.ServeHTTP(rw, req)
 }
 
-func NewHttpLoadBalancer(addrs []string) *HttpLoadBalancer {
+func NewHttpLoadBalancer(addrs []string, t cfg.HTTPTransportConfig) *HttpLoadBalancer {
 	lb := &HttpLoadBalancer{}
 	backends := make([]*url.URL, 0, len(addrs))
 	for _, addr := range addrs {
@@ -84,14 +86,14 @@ func NewHttpLoadBalancer(addrs []string) *HttpLoadBalancer {
 	lb.backends = backends
 
 	transport := &http.Transport{
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 20,
-		MaxConnsPerHost:     200,
+		MaxIdleConns:        t.MaxIdleConns,
+		MaxIdleConnsPerHost: t.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     t.MaxConnsPerHost,
 		DialContext: (&net.Dialer{
-			Timeout: 5 * time.Second,
+			Timeout: t.DialTimeout,
 		}).DialContext,
-		ResponseHeaderTimeout: 30 * time.Second,
-		IdleConnTimeout:       90 * time.Second,
+		ResponseHeaderTimeout: t.ResponseHeaderTimeout,
+		IdleConnTimeout:       t.IdleConnTimeout,
 	}
 	lb.proxy = &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {

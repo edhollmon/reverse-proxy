@@ -41,7 +41,7 @@ func TestHTTPMetrics_RequestsRecorded(t *testing.T) {
 	defer backend.Close()
 
 	router := &HttpRouter{}
-	router.Add("/metrics-test", NewHttpLoadBalancer([]string{backend.URL}))
+	router.Add("/metrics-test", NewHttpLoadBalancer([]string{backend.URL}, noTransport))
 
 	before := testutil.ToFloat64(httpRequestsTotal.WithLabelValues("/metrics-test", "200"))
 
@@ -62,7 +62,7 @@ func TestHTTPMetrics_DurationRecorded(t *testing.T) {
 	defer backend.Close()
 
 	router := &HttpRouter{}
-	router.Add("/metrics-dur", NewHttpLoadBalancer([]string{backend.URL}))
+	router.Add("/metrics-dur", NewHttpLoadBalancer([]string{backend.URL}, noTransport))
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics-dur/bar", nil)
 	router.ServeHTTP(httptest.NewRecorder(), req)

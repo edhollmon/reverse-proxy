@@ -33,6 +33,14 @@ The config file is JSON. Pass a path at startup, or omit it to use the embedded 
                 "type": "http",
                 "prefix": "/api",
                 "lbstrategy": "least-connections",
+                "transport": {
+                    "dialTimeout": "5s",
+                    "responseHeaderTimeout": "30s",
+                    "idleConnTimeout": "90s",
+                    "maxIdleConns": 100,
+                    "maxIdleConnsPerHost": 20,
+                    "maxConnsPerHost": 200
+                },
                 "hosts": [
                     { "host": "10.0.1.1", "port": "8080" },
                     { "host": "10.0.1.2", "port": "8080" }
@@ -61,6 +69,21 @@ The config file is JSON. Pass a path at startup, or omit it to use the embedded 
 | `hosts` | List of upstream hosts |
 | `hosts[].host` | Upstream hostname or IP |
 | `hosts[].port` | Upstream port |
+
+### HTTP transport fields
+
+Each HTTP connection accepts an optional `transport` block. All fields are optional; omitting them uses the defaults shown below.
+
+| Field | Default | Description |
+|---|---|---|
+| `transport.dialTimeout` | `5s` | Timeout for establishing a connection to an upstream host |
+| `transport.responseHeaderTimeout` | `30s` | Time to wait for the upstream to send response headers after the request is sent |
+| `transport.idleConnTimeout` | `90s` | How long an idle keep-alive connection stays in the pool |
+| `transport.maxIdleConns` | `100` | Maximum number of idle connections across all hosts |
+| `transport.maxIdleConnsPerHost` | `20` | Maximum idle connections kept per upstream host |
+| `transport.maxConnsPerHost` | `200` | Maximum total connections (active + idle) per upstream host; `0` means unlimited |
+
+Duration values are Go duration strings: `"500ms"`, `"5s"`, `"2m"`, etc.
 
 ## Running
 

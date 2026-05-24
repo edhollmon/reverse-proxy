@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 )
 
 //go:embed default.config.json
@@ -29,12 +30,22 @@ func (h *HostDetail) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type HTTPTransportConfig struct {
+	DialTimeout           time.Duration
+	ResponseHeaderTimeout time.Duration
+	IdleConnTimeout       time.Duration
+	MaxIdleConns          int
+	MaxIdleConnsPerHost   int
+	MaxConnsPerHost       int
+}
+
 type Connection struct {
 	connType   string
 	Prefix     string
 	Port       string
 	lbstrategy string
 	Backends   []string
+	Transport  HTTPTransportConfig
 }
 
 func (c *Connection) UnmarshalJSON(data []byte) error {
@@ -44,6 +55,14 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 		Port       string       `json:"port"`
 		LBStrategy string       `json:"lbstrategy"`
 		Hosts      []HostDetail `json:"hosts"`
+		Transport  struct {
+			DialTimeout           string `json:"dialTimeout"`
+			ResponseHeaderTimeout string `json:"responseHeaderTimeout"`
+			IdleConnTimeout       string `json:"idleConnTimeout"`
+			MaxIdleConns          int    `json:"maxIdleConns"`
+			MaxIdleConnsPerHost   int    `json:"maxIdleConnsPerHost"`
+			MaxConnsPerHost       int    `json:"maxConnsPerHost"`
+		} `json:"transport"`
 	}
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
@@ -55,6 +74,27 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 	c.Backends = make([]string, len(v.Hosts))
 	for i, h := range v.Hosts {
 		c.Backends[i] = h.host + ":" + h.port
+	}
+	t := v.Transport
+	c.Transport.MaxIdleConns = t.MaxIdleConns
+	c.Transport.MaxIdleConnsPerHost = t.MaxIdleConnsPerHost
+	c.Transport.MaxConnsPerHost = t.MaxConnsPerHost
+	for _, pair := range []struct {
+		s   string
+		dst *time.Duration
+		key string
+	}{
+		{t.DialTimeout, &c.Transport.DialTimeout, "dialTimeout"},
+		{t.ResponseHeaderTimeout, &c.Transport.ResponseHeaderTimeout, "responseHeaderTimeout"},
+		{t.IdleConnTimeout, &c.Transport.IdleConnTimeout, "idleConnTimeout"},
+	} {
+		if pair.s != "" {
+			d, err := time.ParseDuration(pair.s)
+			if err != nil {
+				return fmt.Errorf("invalid %s %q: %w", pair.key, pair.s, err)
+			}
+			*pair.dst = d
+		}
 	}
 	return nil
 }
@@ -77,6 +117,27 @@ type ConfigService struct {
 	Http    HTTPConnectionConfig
 	Metrics MetricsConfig
 	// Web Sockets, gRPC, ...
+}
+
+func applyHTTPTransportDefaults(t *HTTPTransportConfig) {
+	if t.DialTimeout == 0 {
+		t.DialTimeout = 5 * time.Second
+	}
+	if t.ResponseHeaderTimeout == 0 {
+		t.ResponseHeaderTimeout = 30 * time.Second
+	}
+	if t.IdleConnTimeout == 0 {
+		t.IdleConnTimeout = 90 * time.Second
+	}
+	if t.MaxIdleConns == 0 {
+		t.MaxIdleConns = 100
+	}
+	if t.MaxIdleConnsPerHost == 0 {
+		t.MaxIdleConnsPerHost = 20
+	}
+	if t.MaxConnsPerHost == 0 {
+		t.MaxConnsPerHost = 200
+	}
 }
 
 var validLBStrategies = map[string]bool{
@@ -144,6 +205,10 @@ func (cs *ConfigService) parseConfig(data []byte) error {
 		cfg.Metrics.Port = "9090"
 	}
 	metricsEnabled := cfg.Metrics.Enabled == nil || *cfg.Metrics.Enabled
+
+	for i := range cfg.Connections.HTTP {
+		applyHTTPTransportDefaults(&cfg.Connections.HTTP[i].Transport)
+	}
 
 	cs.Tcp = TCPConnectionConfig{Connections: cfg.Connections.TCP}
 	cs.Http = HTTPConnectionConfig{Connections: cfg.Connections.HTTP}

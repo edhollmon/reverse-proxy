@@ -4,7 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	cfg "github.com/edhollmon/reverse-proxy/internal/config"
 )
+
+var noTransport = cfg.HTTPTransportConfig{}
 
 func TestHttpRouter_RouteMatch(t *testing.T) {
 	var hit bool
@@ -15,7 +19,7 @@ func TestHttpRouter_RouteMatch(t *testing.T) {
 	defer backend.Close()
 
 	router := &HttpRouter{}
-	router.Add("/api", NewHttpLoadBalancer([]string{backend.URL}))
+	router.Add("/api", NewHttpLoadBalancer([]string{backend.URL}, noTransport))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
 	rr := httptest.NewRecorder()
@@ -53,7 +57,7 @@ func TestHttpLoadBalancer_RoundRobin(t *testing.T) {
 		defer backends[idx].Close()
 	}
 
-	lb := NewHttpLoadBalancer([]string{backends[0].URL, backends[1].URL})
+	lb := NewHttpLoadBalancer([]string{backends[0].URL, backends[1].URL}, noTransport)
 
 	for i := 0; i < 4; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -70,7 +74,7 @@ func TestHttpLoadBalancer_RoundRobin(t *testing.T) {
 
 func TestNewHttpLoadBalancer_SkipsInvalidURL(t *testing.T) {
 	// "%%invalid" has an invalid percent-encoding, url.Parse returns an error
-	lb := NewHttpLoadBalancer([]string{"%%invalid", "localhost:9999"})
+	lb := NewHttpLoadBalancer([]string{"%%invalid", "localhost:9999"}, noTransport)
 	if len(lb.backends) != 1 {
 		t.Errorf("expected 1 valid backend, got %d", len(lb.backends))
 	}
