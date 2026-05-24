@@ -20,17 +20,17 @@ func TestLoadDefaultConfig(t *testing.T) {
 	}
 
 	tcp := cs.Tcp.Connections[0]
-	if tcp.Port != "9090" {
-		t.Errorf("TCP port = %q, want %q", tcp.Port, "9090")
+	if tcp.Port != "9095" {
+		t.Errorf("TCP port = %q, want %q", tcp.Port, "9095")
 	}
 	if len(tcp.Backends) != 2 {
 		t.Fatalf("TCP backends count = %d, want 2", len(tcp.Backends))
 	}
-	if tcp.Backends[0] != "localhost:9091" {
-		t.Errorf("TCP backend[0] = %q, want %q", tcp.Backends[0], "localhost:9091")
+	if tcp.Backends[0] != "localhost:9096" {
+		t.Errorf("TCP backend[0] = %q, want %q", tcp.Backends[0], "localhost:9096")
 	}
-	if tcp.Backends[1] != "localhost:9092" {
-		t.Errorf("TCP backend[1] = %q, want %q", tcp.Backends[1], "localhost:9092")
+	if tcp.Backends[1] != "localhost:9097" {
+		t.Errorf("TCP backend[1] = %q, want %q", tcp.Backends[1], "localhost:9097")
 	}
 
 	http := cs.Http.Connections[0]
@@ -39,6 +39,13 @@ func TestLoadDefaultConfig(t *testing.T) {
 	}
 	if len(http.Backends) != 2 {
 		t.Errorf("HTTP backends count = %d, want 2", len(http.Backends))
+	}
+
+	if cs.Metrics.Port != "9090" {
+		t.Errorf("Metrics.Port = %q, want %q", cs.Metrics.Port, "9090")
+	}
+	if !cs.Metrics.Enabled {
+		t.Error("Metrics.Enabled = false, want true")
 	}
 }
 
@@ -147,6 +154,57 @@ func TestParseConfig_Validation(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error = %q, want it to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestMetricsConfig(t *testing.T) {
+	const validConn = `"connections":{"tcp":[{"type":"tcp","port":"7070","lbstrategy":"round-robin","hosts":[{"host":"127.0.0.1","port":"7071"}]}]}`
+
+	tests := []struct {
+		name        string
+		json        string
+		wantPort    string
+		wantEnabled bool
+	}{
+		{
+			name:        "absent defaults to port 9090 enabled",
+			json:        `{` + validConn + `}`,
+			wantPort:    "9090",
+			wantEnabled: true,
+		},
+		{
+			name:        "explicit port",
+			json:        `{"metrics":{"port":"2112","enabled":true},` + validConn + `}`,
+			wantPort:    "2112",
+			wantEnabled: true,
+		},
+		{
+			name:        "disabled",
+			json:        `{"metrics":{"enabled":false},` + validConn + `}`,
+			wantPort:    "9090",
+			wantEnabled: false,
+		},
+		{
+			name:        "empty port defaults to 9090",
+			json:        `{"metrics":{"enabled":true},` + validConn + `}`,
+			wantPort:    "9090",
+			wantEnabled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := NewConfigService()
+			if err := cs.parseConfig([]byte(tt.json)); err != nil {
+				t.Fatalf("parseConfig() error: %v", err)
+			}
+			if cs.Metrics.Port != tt.wantPort {
+				t.Errorf("Metrics.Port = %q, want %q", cs.Metrics.Port, tt.wantPort)
+			}
+			if cs.Metrics.Enabled != tt.wantEnabled {
+				t.Errorf("Metrics.Enabled = %v, want %v", cs.Metrics.Enabled, tt.wantEnabled)
 			}
 		})
 	}

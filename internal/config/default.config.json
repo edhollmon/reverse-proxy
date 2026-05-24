@@ -1,13 +1,16 @@
 {
+    "metrics": {
+        "port": "9090"
+    },
     "connections": {
         "tcp": [
             {
                 "type": "tcp",
-                "port": "9090",
+                "port": "9095",
                 "lbstrategy": "round-robin",
                 "hosts": [
-                    { "host": "localhost", "port": "9091" },
-                    { "host": "localhost", "port": "9092" }
+                    { "host": "localhost", "port": "9096" },
+                    { "host": "localhost", "port": "9097" }
                 ]
             }
         ],

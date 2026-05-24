@@ -148,6 +148,10 @@ func (s *TcpServer) start() {
 func (s *TcpServer) handleConn(conn net.Conn) {
 	defer s.grWG.Done()
 
+	tcpConnectionsTotal.WithLabelValues(s.address).Inc()
+	tcpActiveConnections.WithLabelValues(s.address).Inc()
+	defer tcpActiveConnections.WithLabelValues(s.address).Dec()
+
 	cid := s.nextcid.Add(1)
 	slog.Info("client connected", "cid", cid, "remote_addr", conn.RemoteAddr())
 

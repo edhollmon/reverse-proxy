@@ -67,9 +67,15 @@ type HTTPConnectionConfig struct {
 	Connections []Connection
 }
 
+type MetricsConfig struct {
+	Port    string
+	Enabled bool
+}
+
 type ConfigService struct {
-	Tcp  TCPConnectionConfig
-	Http HTTPConnectionConfig
+	Tcp     TCPConnectionConfig
+	Http    HTTPConnectionConfig
+	Metrics MetricsConfig
 	// Web Sockets, gRPC, ...
 }
 
@@ -124,14 +130,24 @@ func (cs *ConfigService) parseConfig(data []byte) error {
 			TCP  []Connection `json:"tcp"`
 			HTTP []Connection `json:"http"`
 		} `json:"connections"`
+		Metrics struct {
+			Port    string `json:"port"`
+			Enabled *bool  `json:"enabled"`
+		} `json:"metrics"`
 	}
 
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	if cfg.Metrics.Port == "" {
+		cfg.Metrics.Port = "9090"
+	}
+	metricsEnabled := cfg.Metrics.Enabled == nil || *cfg.Metrics.Enabled
+
 	cs.Tcp = TCPConnectionConfig{Connections: cfg.Connections.TCP}
 	cs.Http = HTTPConnectionConfig{Connections: cfg.Connections.HTTP}
+	cs.Metrics = MetricsConfig{Port: cfg.Metrics.Port, Enabled: metricsEnabled}
 
 	for i, c := range cs.Tcp.Connections {
 		if err := c.validate(fmt.Sprintf("tcp[%d]", i)); err != nil {

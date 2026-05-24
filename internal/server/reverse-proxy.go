@@ -15,6 +15,7 @@ import (
 type ReverseProxy struct {
 	configService *cfg.ConfigService
 	httpServer    *http.Server
+	metricsServer *http.Server
 	tcpRouter     *TcpRouter
 }
 
@@ -23,6 +24,11 @@ func NewReverseProxy(cs *cfg.ConfigService) *ReverseProxy {
 }
 
 func (rp *ReverseProxy) Shutdown(ctx context.Context) error {
+	if rp.metricsServer != nil {
+		if err := rp.metricsServer.Shutdown(ctx); err != nil {
+			return err
+		}
+	}
 	if rp.httpServer != nil {
 		if err := rp.httpServer.Shutdown(ctx); err != nil {
 			return err
@@ -40,6 +46,16 @@ func (rp *ReverseProxy) Start() error {
 
 	if !hasTCP && !hasHTTP {
 		return fmt.Errorf("no connections configured")
+	}
+
+	if rp.configService.Metrics.Enabled {
+		rp.metricsServer = newMetricsServer(rp.configService.Metrics.Port)
+		go func() {
+			slog.Info("metrics server listening", "port", rp.configService.Metrics.Port)
+			if err := rp.metricsServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("metrics server stopped", "error", err)
+			}
+		}()
 	}
 
 	if hasTCP && hasHTTP {

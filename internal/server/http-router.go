@@ -6,10 +6,21 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 )
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	code int
+}
+
+func (rw *statusResponseWriter) WriteHeader(code int) {
+	rw.code = code
+	rw.ResponseWriter.WriteHeader(code)
+}
 
 type HttpRouter struct {
 	routes []HttpRoute
@@ -40,7 +51,11 @@ func (r *HttpRouter) Add(prefix string, lb *HttpLoadBalancer) {
 func (router *HttpRouter) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for _, route := range router.routes {
 		if strings.HasPrefix(req.URL.Path, route.prefix) {
-			route.lb.ServeHTTP(rw, req)
+			srw := &statusResponseWriter{ResponseWriter: rw, code: http.StatusOK}
+			start := time.Now()
+			route.lb.ServeHTTP(srw, req)
+			httpRequestDuration.WithLabelValues(route.prefix).Observe(time.Since(start).Seconds())
+			httpRequestsTotal.WithLabelValues(route.prefix, strconv.Itoa(srw.code)).Inc()
 			return
 		}
 	}
