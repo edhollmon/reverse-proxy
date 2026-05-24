@@ -76,7 +76,7 @@ func (rp *ReverseProxy) Start() error {
 func (rp *ReverseProxy) startHttpProxy() {
 	router := &HttpRouter{}
 	for _, httpConfig := range rp.configService.Http.Connections {
-		router.Add(httpConfig.Prefix, NewHttpLoadBalancer(httpConfig.Backends, httpConfig.Transport))
+		router.Add(httpConfig.Prefix, NewHttpLoadBalancer(httpConfig.Backends, httpConfig.HTTPTransport))
 	}
 	rp.httpServer = &http.Server{Addr: ":8080", Handler: router}
 	slog.Info("HTTP reverse proxy listening", "port", 8080)
@@ -97,7 +97,7 @@ func (rp *ReverseProxy) startTcpProxy() {
 				"nc_port", backend[strings.LastIndex(backend, ":")+1:],
 			)
 		}
-		router.Add(":"+tcpConfig.Port, tcpConfig.Backends)
+		router.Add(":"+tcpConfig.Port, tcpConfig.Backends, tcpConfig.TCPTransport)
 	}
 	rp.tcpRouter = router
 	router.Start()

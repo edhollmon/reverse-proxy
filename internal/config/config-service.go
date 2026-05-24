@@ -30,6 +30,11 @@ func (h *HostDetail) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type TCPTransportConfig struct {
+	DialTimeout time.Duration
+	KeepAlive   time.Duration
+}
+
 type HTTPTransportConfig struct {
 	DialTimeout           time.Duration
 	ResponseHeaderTimeout time.Duration
@@ -40,12 +45,13 @@ type HTTPTransportConfig struct {
 }
 
 type Connection struct {
-	connType   string
-	Prefix     string
-	Port       string
-	lbstrategy string
-	Backends   []string
-	Transport  HTTPTransportConfig
+	connType     string
+	Prefix       string
+	Port         string
+	lbstrategy   string
+	Backends     []string
+	TCPTransport TCPTransportConfig
+	HTTPTransport HTTPTransportConfig
 }
 
 func (c *Connection) UnmarshalJSON(data []byte) error {
@@ -57,6 +63,7 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 		Hosts      []HostDetail `json:"hosts"`
 		Transport  struct {
 			DialTimeout           string `json:"dialTimeout"`
+			KeepAlive             string `json:"keepAlive"`
 			ResponseHeaderTimeout string `json:"responseHeaderTimeout"`
 			IdleConnTimeout       string `json:"idleConnTimeout"`
 			MaxIdleConns          int    `json:"maxIdleConns"`
@@ -76,17 +83,19 @@ func (c *Connection) UnmarshalJSON(data []byte) error {
 		c.Backends[i] = h.host + ":" + h.port
 	}
 	t := v.Transport
-	c.Transport.MaxIdleConns = t.MaxIdleConns
-	c.Transport.MaxIdleConnsPerHost = t.MaxIdleConnsPerHost
-	c.Transport.MaxConnsPerHost = t.MaxConnsPerHost
+	c.HTTPTransport.MaxIdleConns = t.MaxIdleConns
+	c.HTTPTransport.MaxIdleConnsPerHost = t.MaxIdleConnsPerHost
+	c.HTTPTransport.MaxConnsPerHost = t.MaxConnsPerHost
 	for _, pair := range []struct {
 		s   string
 		dst *time.Duration
 		key string
 	}{
-		{t.DialTimeout, &c.Transport.DialTimeout, "dialTimeout"},
-		{t.ResponseHeaderTimeout, &c.Transport.ResponseHeaderTimeout, "responseHeaderTimeout"},
-		{t.IdleConnTimeout, &c.Transport.IdleConnTimeout, "idleConnTimeout"},
+		{t.DialTimeout, &c.HTTPTransport.DialTimeout, "dialTimeout"},
+		{t.DialTimeout, &c.TCPTransport.DialTimeout, "dialTimeout"},
+		{t.ResponseHeaderTimeout, &c.HTTPTransport.ResponseHeaderTimeout, "responseHeaderTimeout"},
+		{t.IdleConnTimeout, &c.HTTPTransport.IdleConnTimeout, "idleConnTimeout"},
+		{t.KeepAlive, &c.TCPTransport.KeepAlive, "keepAlive"},
 	} {
 		if pair.s != "" {
 			d, err := time.ParseDuration(pair.s)
@@ -117,6 +126,15 @@ type ConfigService struct {
 	Http    HTTPConnectionConfig
 	Metrics MetricsConfig
 	// Web Sockets, gRPC, ...
+}
+
+func applyTCPTransportDefaults(t *TCPTransportConfig) {
+	if t.DialTimeout == 0 {
+		t.DialTimeout = 5 * time.Second
+	}
+	if t.KeepAlive == 0 {
+		t.KeepAlive = 30 * time.Second
+	}
 }
 
 func applyHTTPTransportDefaults(t *HTTPTransportConfig) {
@@ -206,8 +224,11 @@ func (cs *ConfigService) parseConfig(data []byte) error {
 	}
 	metricsEnabled := cfg.Metrics.Enabled == nil || *cfg.Metrics.Enabled
 
+	for i := range cfg.Connections.TCP {
+		applyTCPTransportDefaults(&cfg.Connections.TCP[i].TCPTransport)
+	}
 	for i := range cfg.Connections.HTTP {
-		applyHTTPTransportDefaults(&cfg.Connections.HTTP[i].Transport)
+		applyHTTPTransportDefaults(&cfg.Connections.HTTP[i].HTTPTransport)
 	}
 
 	cs.Tcp = TCPConnectionConfig{Connections: cfg.Connections.TCP}

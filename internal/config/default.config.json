@@ -8,6 +8,10 @@
                 "type": "tcp",
                 "port": "9095",
                 "lbstrategy": "round-robin",
+                "transport": {
+                    "dialTimeout": "5s",
+                    "keepAlive": "30s"
+                },
                 "hosts": [
                     { "host": "localhost", "port": "9096" },
                     { "host": "localhost", "port": "9097" }

@@ -22,6 +22,10 @@ The config file is JSON. Pass a path at startup, or omit it to use the embedded 
                 "type": "tcp",
                 "port": "9095",
                 "lbstrategy": "round-robin",
+                "transport": {
+                    "dialTimeout": "5s",
+                    "keepAlive": "30s"
+                },
                 "hosts": [
                     { "host": "10.0.0.1", "port": "9000" },
                     { "host": "10.0.0.2", "port": "9000" }
@@ -69,6 +73,15 @@ The config file is JSON. Pass a path at startup, or omit it to use the embedded 
 | `hosts` | List of upstream hosts |
 | `hosts[].host` | Upstream hostname or IP |
 | `hosts[].port` | Upstream port |
+
+### TCP transport fields
+
+Each TCP connection accepts an optional `transport` block.
+
+| Field | Default | Description |
+|---|---|---|
+| `transport.dialTimeout` | `5s` | Timeout for establishing a connection to an upstream host; `0` means no timeout |
+| `transport.keepAlive` | `30s` | Interval between TCP keep-alive probes to detect dead connections; `0` disables keep-alive |
 
 ### HTTP transport fields
 

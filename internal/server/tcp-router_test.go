@@ -6,7 +6,11 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	cfg "github.com/edhollmon/reverse-proxy/internal/config"
 )
+
+var noTCPTransport = cfg.TCPTransportConfig{}
 
 func TestTcpLoadBalancer_Next_RoundRobin(t *testing.T) {
 	lb := &TcpLoadBalancer{backends: []string{"a:1", "b:2", "c:3"}}
@@ -81,7 +85,7 @@ func TestTcpServer_ProxiesData(t *testing.T) {
 		_, _ = io.Copy(conn, conn)
 	}()
 
-	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()})
+	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()}, noTCPTransport)
 	go lb.server.start()
 
 	proxyAddr := waitForListener(t, lb.server)
@@ -124,7 +128,7 @@ func TestTcpServer_Shutdown_DrainsActiveConnections(t *testing.T) {
 		_, _ = io.Copy(conn, conn)
 	}()
 
-	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()})
+	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()}, noTCPTransport)
 	go lb.server.start()
 	proxyAddr := waitForListener(t, lb.server)
 
@@ -183,7 +187,7 @@ func TestTcpRouter_Shutdown_RespectsContextTimeout(t *testing.T) {
 		time.Sleep(10 * time.Second)
 	}()
 
-	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()})
+	lb := NewTcpLoadBalancer("127.0.0.1:0", []string{backendLn.Addr().String()}, noTCPTransport)
 	go lb.server.start()
 	proxyAddr := waitForListener(t, lb.server)
 

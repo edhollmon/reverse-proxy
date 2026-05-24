@@ -9,14 +9,16 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+
+	cfg "github.com/edhollmon/reverse-proxy/internal/config"
 )
 
 type TcpRouter struct {
 	lbs []*TcpLoadBalancer
 }
 
-func (router *TcpRouter) Add(listenAddr string, backends []string) {
-	router.lbs = append(router.lbs, NewTcpLoadBalancer(listenAddr, backends))
+func (router *TcpRouter) Add(listenAddr string, backends []string, t cfg.TCPTransportConfig) {
+	router.lbs = append(router.lbs, NewTcpLoadBalancer(listenAddr, backends, t))
 }
 
 func (router *TcpRouter) Start() {
@@ -57,9 +59,9 @@ type TcpLoadBalancer struct {
 	server   *TcpServer
 }
 
-func NewTcpLoadBalancer(listenAddr string, backends []string) *TcpLoadBalancer {
+func NewTcpLoadBalancer(listenAddr string, backends []string, t cfg.TCPTransportConfig) *TcpLoadBalancer {
 	lb := &TcpLoadBalancer{backends: backends}
-	lb.server = newTCPServer(listenAddr, lb)
+	lb.server = newTCPServer(listenAddr, lb, t)
 	return lb
 }
 
@@ -91,19 +93,21 @@ func (c *tcpclient) proxy() {
 }
 
 type TcpServer struct {
-	mu      sync.RWMutex
+	mu       sync.RWMutex
 	listener net.Listener
-	address string
-	lb      *TcpLoadBalancer
-	grWG    sync.WaitGroup
-	clients map[uint64]*tcpclient
-	nextcid atomic.Uint64
+	address  string
+	lb       *TcpLoadBalancer
+	dialer   net.Dialer
+	grWG     sync.WaitGroup
+	clients  map[uint64]*tcpclient
+	nextcid  atomic.Uint64
 }
 
-func newTCPServer(address string, lb *TcpLoadBalancer) *TcpServer {
+func newTCPServer(address string, lb *TcpLoadBalancer, t cfg.TCPTransportConfig) *TcpServer {
 	return &TcpServer{
 		address: address,
 		lb:      lb,
+		dialer:  net.Dialer{Timeout: t.DialTimeout, KeepAlive: t.KeepAlive},
 		clients: make(map[uint64]*tcpclient),
 	}
 }
@@ -156,7 +160,7 @@ func (s *TcpServer) handleConn(conn net.Conn) {
 	slog.Info("client connected", "cid", cid, "remote_addr", conn.RemoteAddr())
 
 	backendAddr := s.lb.next()
-	backendConn, err := net.Dial("tcp", backendAddr)
+	backendConn, err := s.dialer.Dial("tcp", backendAddr)
 	if err != nil {
 		slog.Error("failed to connect to backend", "cid", cid, "backend", backendAddr, "error", err)
 		_ = conn.Close()
